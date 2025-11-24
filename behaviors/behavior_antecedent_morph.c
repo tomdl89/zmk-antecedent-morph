@@ -77,7 +77,7 @@ static int antecedent_morph_keycode_state_changed_listener(const zmk_event_t *eh
     LOG_DBG("%s keycode %d; page %d; implicit mods %d; explicit mods %d; key code 0x%08x",
             ev->state ? "down" : "up", ev->keycode, ev->usage_page, ev->implicit_modifiers,
             ev->explicit_modifiers, code);
-    if ((ev->state) && ((ev->keycode < 0xe0) || (ev->keycode > 0xff))) {
+    if (ev->state)  {
         LOG_DBG("global <code_pressed> variable changes from 0x%08x to 0x%08x", code_pressed, code);
         code_pressed = code;
         time_pressed = ev->timestamp;
