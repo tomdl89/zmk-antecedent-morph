@@ -15,6 +15,7 @@
 #include <zmk/event_manager.h>
 #include <zmk/events/keycode_state_changed.h>
 #include <zmk/hid.h>
+#include <stdbool.h>
 
 LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 
@@ -30,6 +31,7 @@ struct behavior_antecedent_morph_config {
     size_t bindings_len;                   // length of the array of morphed behaviors
     struct zmk_behavior_binding *bindings; // array of morphed behaviors
     int32_t antecedents_len;               // length of the array of antecedents (key codes)
+    bool allow_mod_antecedents;            // boolean flag where true = allow modifier antecedents
     int32_t antecedents[];                 // array of antecedents (key codes)
 };
 
@@ -70,14 +72,13 @@ ZMK_SUBSCRIPTION(behavior_antecedent_morph, zmk_keycode_state_changed);
 static int antecedent_morph_keycode_state_changed_listener(const zmk_event_t *eh) {
 
     struct zmk_keycode_state_changed *ev = as_zmk_keycode_state_changed(eh);
-
     int32_t code = ((ev->implicit_modifiers & 0xff) << 24) | ((ev->usage_page & 0xff) << 16) |
                    (ev->keycode & 0xffff);
 
     LOG_DBG("%s keycode %d; page %d; implicit mods %d; explicit mods %d; key code 0x%08x",
             ev->state ? "down" : "up", ev->keycode, ev->usage_page, ev->implicit_modifiers,
             ev->explicit_modifiers, code);
-    if ((ev->state) && ((ev->keycode < 0xe0) || (ev->keycode > 0xff))) {
+    if (ev->state)  {
         LOG_DBG("global <code_pressed> variable changes from 0x%08x to 0x%08x", code_pressed, code);
         code_pressed = code;
         time_pressed = ev->timestamp;
@@ -108,6 +109,22 @@ static int on_antecedent_morph_binding_pressed(struct zmk_behavior_binding *bind
     uint32_t delay_ms =
         ((event.timestamp - time_pressed) < 0) ? 0 : (uint32_t)(event.timestamp - time_pressed);
 
+    uint16_t last_keycode = (uint16_t)(code_pressed & 0xffff);
+    bool keycode_allowed =
+        (last_keycode < (cfg->allow_mod_antecedents ? 0xe8 : 0xe0)) ||
+        (last_keycode > 0xff);
+
+    if (!keycode_allowed) {
+        // Treat as if there was no valid antecedent
+        morph = -1;
+    } else {
+        for (int i = 0; i < cfg->antecedents_len; i++) {
+            if (code_pressed == cfg->antecedents[i]) {
+                morph = i;
+            }
+        }
+    }
+
     LOG_DBG("press zmk,behavior-antecedent-morph serial no. %d when <code_pressed> is 0x%08x; "
             "delay %dms; and explicit_mods 0x%02x",
             cfg->serial, code_pressed, delay_ms, zmk_hid_get_explicit_mods());
@@ -115,12 +132,6 @@ static int on_antecedent_morph_binding_pressed(struct zmk_behavior_binding *bind
     if (data->pressed_binding != NULL) {
         LOG_ERR("Can't press the same antecedent-morph twice");
         return -ENOTSUP;
-    }
-
-    for (int i = 0; i < cfg->antecedents_len; i++) {
-        if (code_pressed == cfg->antecedents[i]) {
-            morph = i;
-        }
     }
 
     if ((morph >= 0) && delay_ms < cfg->max_delay_ms) {
@@ -233,6 +244,7 @@ static int behavior_antecedent_morph_init(const struct device *dev) {
         .bindings = behavior_antecedent_morph_config_##n##_bindings,                               \
         .bindings_len = DT_INST_PROP_LEN(n, bindings),                                             \
         .antecedents = DT_INST_PROP(n, antecedents),                                               \
+        .allow_mod_antecedents = DT_INST_PROP_OR(n, allow_mod_antecedents, false),                 \
         .antecedents_len = DT_INST_PROP_LEN(n, antecedents)};                                      \
     static struct behavior_antecedent_morph_data behavior_antecedent_morph_data_##n = {};          \
     BEHAVIOR_DT_INST_DEFINE(                                                                       \
