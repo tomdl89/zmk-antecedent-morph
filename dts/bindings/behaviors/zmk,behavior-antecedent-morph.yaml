@@ -21,3 +21,6 @@ properties:
   max-delay-ms:
     type: int
     default: -1
+  allow-mod-antecedents:
+    type: boolean
+    required: false
