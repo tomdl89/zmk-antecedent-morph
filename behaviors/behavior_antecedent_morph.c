@@ -15,6 +15,7 @@
 #include <zmk/event_manager.h>
 #include <zmk/events/keycode_state_changed.h>
 #include <zmk/hid.h>
+#include <stdbool.h>
 
 LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 
@@ -31,6 +32,7 @@ struct behavior_antecedent_morph_config {
     struct zmk_behavior_binding *bindings; // array of morphed behaviors
     int32_t antecedents_len;               // length of the array of antecedents (key codes)
     int32_t antecedents[];                 // array of antecedents (key codes)
+    bool allow_mod_antecedents;            // boolean flag where true = allow modifier antecedents
 };
 
 // data struct per instance
@@ -77,7 +79,8 @@ static int antecedent_morph_keycode_state_changed_listener(const zmk_event_t *eh
     LOG_DBG("%s keycode %d; page %d; implicit mods %d; explicit mods %d; key code 0x%08x",
             ev->state ? "down" : "up", ev->keycode, ev->usage_page, ev->implicit_modifiers,
             ev->explicit_modifiers, code);
-    if (ev->state)  {
+    const bool is_real_antecedent_key = (ev->keycode < (cfg->allow_mod_antecedents ? 0xe8 : 0xe0));
+    if ((ev->state) && (is_real_antecedent_key || (ev->keycode > 0xff)))  {
         LOG_DBG("global <code_pressed> variable changes from 0x%08x to 0x%08x", code_pressed, code);
         code_pressed = code;
         time_pressed = ev->timestamp;
@@ -233,7 +236,8 @@ static int behavior_antecedent_morph_init(const struct device *dev) {
         .bindings = behavior_antecedent_morph_config_##n##_bindings,                               \
         .bindings_len = DT_INST_PROP_LEN(n, bindings),                                             \
         .antecedents = DT_INST_PROP(n, antecedents),                                               \
-        .antecedents_len = DT_INST_PROP_LEN(n, antecedents)};                                      \
+        .antecedents_len = DT_INST_PROP_LEN(n, antecedents);                                       \
+        .allow_mod_antecedents = DT_INST_PROP_OR(n, allow_mod_antecedents, false)};                \
     static struct behavior_antecedent_morph_data behavior_antecedent_morph_data_##n = {};          \
     BEHAVIOR_DT_INST_DEFINE(                                                                       \
         n, behavior_antecedent_morph_init, NULL, &behavior_antecedent_morph_data_##n,              \
