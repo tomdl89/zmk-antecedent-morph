@@ -31,8 +31,8 @@ struct behavior_antecedent_morph_config {
     size_t bindings_len;                   // length of the array of morphed behaviors
     struct zmk_behavior_binding *bindings; // array of morphed behaviors
     int32_t antecedents_len;               // length of the array of antecedents (key codes)
-    int32_t antecedents[];                 // array of antecedents (key codes)
     bool allow_mod_antecedents;            // boolean flag where true = allow modifier antecedents
+    int32_t antecedents[];                 // array of antecedents (key codes)
 };
 
 // data struct per instance
@@ -236,8 +236,8 @@ static int behavior_antecedent_morph_init(const struct device *dev) {
         .bindings = behavior_antecedent_morph_config_##n##_bindings,                               \
         .bindings_len = DT_INST_PROP_LEN(n, bindings),                                             \
         .antecedents = DT_INST_PROP(n, antecedents),                                               \
-        .antecedents_len = DT_INST_PROP_LEN(n, antecedents);                                       \
-        .allow_mod_antecedents = DT_INST_PROP_OR(n, allow_mod_antecedents, false)};                \
+        .allow_mod_antecedents = DT_INST_PROP_OR(n, allow_mod_antecedents, false),                 \
+        .antecedents_len = DT_INST_PROP_LEN(n, antecedents)};                                      \
     static struct behavior_antecedent_morph_data behavior_antecedent_morph_data_##n = {};          \
     BEHAVIOR_DT_INST_DEFINE(                                                                       \
         n, behavior_antecedent_morph_init, NULL, &behavior_antecedent_morph_data_##n,              \
